@@ -19,7 +19,7 @@ Add these in repository Settings → Secrets and variables → Actions → New r
 - `YOUTUBE_REFRESH_TOKEN` — refresh token authorized by the channel owner with scope `https://www.googleapis.com/auth/youtube.upload`.
 
 Optional repository variable:
-- `YOUTUBE_PRIVACY` — `public`, `unlisted` or `private`; defaults to public.
+- `YOUTUBE_PRIVACY` — `public`, `unlisted` or `private`; defaults to private until Google verifies the API project.
 
 Never commit keys or tokens into this repository or send them in chat.
 
@@ -32,14 +32,17 @@ Never commit keys or tokens into this repository or send them in chat.
 
 Google may restrict uploads from unverified API projects to private visibility. If YouTube rejects public upload, set `YOUTUBE_PRIVACY=private` until Google verifies the API project. Do not assume a successful API upload means the video is public; verify the resulting Shorts URL.
 
-## Test it
+## Test it without credentials
+A separate Pipeline Smoke Test runs on relevant code changes. It fetches an official RSS item, generates a clearly labelled demo narration, renders the MP4 offline, validates the video streams and stores a 7-day artifact. It does not call Gemini or upload to YouTube. Download the `daily-shorts-pipeline-demo` artifact from the Actions run.
+
+## Production test
 1. Add all four secrets.
 2. Open Actions → Daily AI News Short → Run workflow.
 3. Inspect the run logs and download the `daily-short-<run>` artifact.
 4. Verify the video and the resulting YouTube URL before relying on the daily schedule.
 
 ## Honest limitations
-- The offline `en-in` espeak-ng voice is synthetic and may not sound like a natural Indian presenter.
+- The offline eSpeak NG voice is synthetic and may not sound like a natural Indian presenter. The runner selects `en-in` when installed and falls back to `en`.
 - The visuals are a designed motion title card with captions, not generated cinematic footage.
 - RSS discovery alone is not full fact-checking. The script uses official feed headlines and source links; review important claims and source pages.
 - Gemini free-tier limits and availability can change. A quota or model error stops the workflow without uploading.
