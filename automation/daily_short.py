@@ -23,7 +23,7 @@ FEEDS = [
     "https://www.anthropic.com/news/rss.xml",
     "https://blogs.nvidia.com/feed/",
 ]
-MODEL = "gemini-2.5-flash"
+MODEL = os.getenv("GEMINI_MODEL", "gemini-3.8-flash")
 
 def require_env(name: str) -> str:
     value = os.getenv(name, "").strip()
