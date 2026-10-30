@@ -116,7 +116,7 @@ def render(data):
     (OUT/"script.txt").write_text(script, encoding="utf-8")
     (OUT/"metadata.json").write_text(json.dumps(data,indent=2,ensure_ascii=False),encoding="utf-8")
     voices=subprocess.run(["espeak-ng","--voices"],capture_output=True,text=True,check=True).stdout
-    voice="en-in" if re.search(r"\\ben-in\\b",voices) else "en"
+    voice="en-in" if re.search(r"\ben-in\b",voices) else "en"
     subprocess.run(["espeak-ng","-v",voice,"-s","148","-w",str(OUT/"voice.wav"),script],check=True)
     # Build a clean 9:16 title-card background; audio + timed subtitles make a real Short.
     W,H = 720,1280
