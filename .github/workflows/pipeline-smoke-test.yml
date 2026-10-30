@@ -1,0 +1,43 @@
+name: Pipeline Smoke Test
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "automation/**"
+      - "requirements.txt"
+      - ".github/workflows/**"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  render-demo:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install FFmpeg and offline narration
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y ffmpeg espeak-ng fonts-dejavu-core
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Install Python packages
+        run: pip install -r requirements.txt
+      - name: Run credential-free smoke test
+        env:
+          TEST_MODE: "1"
+        run: python automation/daily_short.py --test
+      - name: Validate MP4 with ffprobe
+        run: |
+          ffprobe -v error -show_entries format=duration:stream=codec_type,width,height -of json output/daily-short.mp4
+          test -s output/daily-short.mp4
+      - name: Upload demo artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: daily-shorts-pipeline-demo
+          path: output/
+          retention-days: 7
