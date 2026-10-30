@@ -37,8 +37,9 @@ def clean(s: str) -> str:
 def fetch_items():
     items = []
     for feed in FEEDS:
+        feed_items = []
         try:
-            r = requests.get(feed, timeout=15, headers={"User-Agent":"DailyAINewsShort/1.0"})
+            r = requests.get(feed, timeout=20, headers={"User-Agent":"DailyAINewsShort/1.0"})
             r.raise_for_status()
             root = ET.fromstring(r.content)
             for item in root.findall(".//item")[:8]:
@@ -47,20 +48,21 @@ def fetch_items():
                 desc = clean(item.findtext("description"))
                 pub = clean(item.findtext("pubDate"))
                 if title and link.startswith("https://"):
-                    items.append({"title":title,"url":link,"summary":desc[:500],"published":pub,"domain":urlparse(link).netloc})
-            # Atom fallback
-            if not items:
+                    feed_items.append({"title":title,"url":link,"summary":desc[:500],"published":pub,"domain":urlparse(link).netloc})
+            if not feed_items:
                 ns = {"a":"http://www.w3.org/2005/Atom"}
                 for entry in root.findall(".//a:entry", ns)[:8]:
                     title = clean(entry.findtext("a:title", default="", namespaces=ns))
-                    linkel = entry.find("a:link", ns)
+                    linkel = entry.find("a:link[@rel='alternate']", ns) or entry.find("a:link", ns)
                     link = linkel.attrib.get("href","") if linkel is not None else ""
-                    summary = clean(entry.findtext("a:summary", default="", namespaces=ns))
+                    summary = clean(entry.findtext("a:summary", default="", namespaces=ns) or entry.findtext("a:content", default="", namespaces=ns))
+                    pub = clean(entry.findtext("a:published", default="", namespaces=ns) or entry.findtext("a:updated", default="", namespaces=ns))
                     if title and link.startswith("https://"):
-                        items.append({"title":title,"url":link,"summary":summary[:500],"published":"","domain":urlparse(link).netloc})
+                        feed_items.append({"title":title,"url":link,"summary":summary[:500],"published":pub,"domain":urlparse(link).netloc})
+            items.extend(feed_items)
+            print(f"Feed OK {feed}: {len(feed_items)} items")
         except Exception as e:
             print(f"Feed unavailable {feed}: {e}")
-    # de-duplicate
     unique = {x["url"]:x for x in items}
     return list(unique.values())[:24]
 
@@ -113,7 +115,9 @@ def render(data):
     script = data["script"]
     (OUT/"script.txt").write_text(script, encoding="utf-8")
     (OUT/"metadata.json").write_text(json.dumps(data,indent=2,ensure_ascii=False),encoding="utf-8")
-    subprocess.run(["espeak-ng","-v","en-in","-s","148","-w",str(OUT/"voice.wav"),script],check=True)
+    voices=subprocess.run(["espeak-ng","--voices"],capture_output=True,text=True,check=True).stdout
+    voice="en-in" if re.search(r"\\ben-in\\b",voices) else "en"
+    subprocess.run(["espeak-ng","-v",voice,"-s","148","-w",str(OUT/"voice.wav"),script],check=True)
     # Build a clean 9:16 title-card background; audio + timed subtitles make a real Short.
     W,H = 720,1280
     img = Image.new("RGB",(W,H),(11,22,42))
@@ -194,6 +198,26 @@ def upload(data):
     print(f"UPLOAD_SUCCESS https://youtube.com/shorts/{video_id}")
 
 def main():
+    test_mode = "--test" in sys.argv or os.getenv("TEST_MODE","").lower() in ("1","true","yes")
+    if test_mode:
+        items=fetch_items()
+        if not items:
+            raise RuntimeError("Test mode could not retrieve any official RSS entries.")
+        chosen=items[0]
+        data={
+            "status":"ready",
+            "title":"Daily AI News — Automated Pipeline Test",
+            "script":("This is an automated pipeline test for the Daily AI News channel. "
+                      "The system successfully retrieved an item from an official AI publisher feed. "
+                      "This demo validates the narration, vertical video rendering, subtitles and artifact output. "
+                      "It is not a news report and makes no claim about the linked story."),
+            "description":"Automated pipeline demo. Not a news publication.",
+            "used_urls":[chosen["url"]],
+            "sources":[chosen]
+        }
+        render(data)
+        print("TEST_RENDER_SUCCESS: output/daily-short.mp4")
+        return
     for name in ["GEMINI_API_KEY","YOUTUBE_CLIENT_ID","YOUTUBE_CLIENT_SECRET","YOUTUBE_REFRESH_TOKEN"]:
         require_env(name)
     items=fetch_items()
